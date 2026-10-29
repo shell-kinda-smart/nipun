@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 use PayLens\Core\Kernel;
 use PayLens\Core\Request;
+use PayLens\Core\DeploymentSetup;
+use PayLens\Core\Response;
 
 /** @var \PayLens\Core\App $app */
 $app = require dirname(__DIR__, 2) . '/bootstrap.php';
@@ -38,5 +40,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: same-origin');
+
+try {
+    DeploymentSetup::ensure($app);
+} catch (\Throwable $error) {
+    error_log((string) $error);
+    Response::error(
+        'deployment_setup_failed',
+        'The application database could not be prepared. Check the function logs.',
+        500,
+    );
+    exit;
+}
 
 (new Kernel($app))->handle(Request::capture());

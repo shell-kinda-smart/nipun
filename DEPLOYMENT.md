@@ -12,26 +12,29 @@ The database may be shared with another application. PostgreSQL schemas are
 separate namespaces, so DB_SCHEMA=paylens prevents PayLens migrations and
 queries from reading or changing tables in public or any other schema.
 
-## 1. Required Vercel environment variables
+## 1. Environment file
 
-Add these in Project Settings → Environment Variables for Production, Preview
-and Development:
+For the zero-configuration demo, import the existing
+rags-to-riches/.env file into Vercel's Environment Variables screen. PayLens
+uses its DATABASE_URL and ignores the unrelated Rags to Riches variables.
+Do not commit this file: the GitHub repository is public.
+
+No additional variables are required. On Vercel, PayLens automatically uses
+these safe demo defaults:
 
 | Variable | Value |
 |---|---|
-| DATABASE_URL | PostgreSQL/Neon pooled connection URL |
-| DB_DRIVER | pgsql |
+| DATABASE_URL | Read from the imported environment file |
+| DB_DRIVER | Detected as pgsql from DATABASE_URL |
 | DB_SCHEMA | paylens |
-| APP_ENV | production for real use; demo for a public fictional-data demo |
-| APP_DEBUG | false |
-| APP_DEMO_MODE | false for real use; true only with APP_ENV=demo |
-| APP_URL | Your final Vercel URL, for example https://nipun.vercel.app |
-| APP_FRONTEND_URL | The same Vercel URL |
+| APP_ENV | demo |
+| APP_DEMO_MODE | true |
+| APP_AUTO_SETUP | true |
+| APP_URL | Detected from Vercel |
+| APP_FRONTEND_URL | Detected from Vercel |
 | APP_TIMEZONE | Asia/Kolkata |
 | SESSION_COOKIE_SECURE | true |
 | SESSION_COOKIE_SAMESITE | Lax |
-| PAYLENS_SEED_PASSWORD | A new strong password |
-| APP_SETUP_TOKEN | A temporary random value of at least 32 characters |
 
 Leave VITE_API_URL and CORS_ORIGINS unset. The frontend and API use the same
 Vercel origin.
@@ -39,29 +42,12 @@ Vercel origin.
 Never paste database credentials into a tracked file. Vercel encrypts project
 environment variables; backend/.env is ignored by both Git and Vercel.
 
-## 2. Create and seed the isolated schema
+## 2. Automatic isolated schema setup
 
-Before the first deployment, run the migrations and optional demo seed with
-the same DATABASE_URL, DB_DRIVER=pgsql and DB_SCHEMA=paylens values:
-
-~~~bash
-php backend/bin/migrate.php
-php backend/bin/setup.php
-~~~
-
-migrate.php only applies missing migrations. setup.php leaves an existing
-dataset alone.
-
-If PHP is not installed locally, deploy once with APP_SETUP_TOKEN set and call
-the protected one-time setup function:
-
-~~~bash
-curl -X POST https://YOUR-DOMAIN/api/setup \
-  -H "Authorization: Bearer YOUR_APP_SETUP_TOKEN"
-~~~
-
-After it succeeds, remove APP_SETUP_TOKEN from Vercel and redeploy. The setup
-URL then returns 404. Never commit or share this token.
+The first API request automatically creates the paylens schema, applies all
+pending migrations and loads the fictional demo dataset. PostgreSQL advisory
+locking prevents concurrent Vercel cold starts from racing. Existing data is
+left alone on later starts.
 
 ## 3. Import the GitHub repository
 
@@ -72,10 +58,9 @@ URL then returns 404. Never commit or share this token.
    - Framework: Vite
    - Build command: npm run build
    - Output directory: dist
-5. Add the environment variables above.
+5. Import rags-to-riches/.env in the Environment Variables screen.
 6. Select Deploy.
-7. Run the one-time setup call from section 2.
-8. Remove APP_SETUP_TOKEN and redeploy.
+7. Open the deployed site. Its first API request performs the isolated setup.
 
 Future pushes to main create new production deployments automatically.
 

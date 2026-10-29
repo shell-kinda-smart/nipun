@@ -13,19 +13,24 @@ declare(strict_types=1);
 $root = dirname(__DIR__);
 $databaseUrl = getenv('DATABASE_URL') ?: '';
 $defaultDriver = preg_match('#^postgres(?:ql)?://#i', $databaseUrl) === 1 ? 'pgsql' : 'mysql';
+$onVercel = getenv('VERCEL') === '1';
+$vercelUrl = getenv('VERCEL_PROJECT_PRODUCTION_URL') ?: (getenv('VERCEL_URL') ?: '');
+$defaultUrl = $vercelUrl !== '' ? 'https://' . $vercelUrl : 'http://localhost:8080';
 
 return [
     'app' => [
         'name' => 'PayLens API',
-        'env' => getenv('APP_ENV') ?: 'development',
+        'env' => getenv('APP_ENV') ?: ($onVercel ? 'demo' : 'development'),
         'debug' => filter_var(getenv('APP_DEBUG') ?: 'false', FILTER_VALIDATE_BOOL),
-        'url' => getenv('APP_URL') ?: 'http://localhost:8080',
+        'url' => getenv('APP_URL') ?: $defaultUrl,
         // Where the frontend lives — the links in emails point here.
-        'frontend_url' => getenv('APP_FRONTEND_URL') ?: 'http://localhost:5173',
+        'frontend_url' => getenv('APP_FRONTEND_URL') ?: (
+            $onVercel ? $defaultUrl : 'http://localhost:5173'
+        ),
         // Demo affordances (one-click role login) are only available when
         // this is on. It is switched off in production.
         'demo_mode' => filter_var(getenv('APP_DEMO_MODE') ?: 'true', FILTER_VALIDATE_BOOL),
-        'timezone' => getenv('APP_TIMEZONE') ?: 'UTC',
+        'timezone' => getenv('APP_TIMEZONE') ?: ($onVercel ? 'Asia/Kolkata' : 'UTC'),
         // Used on the official notice and in emails.
         'organisation' => getenv('APP_ORGANISATION') ?: 'PayLens Technologies Pvt. Ltd.',
         'hr_contact' => getenv('APP_HR_CONTACT') ?: 'people@paylens.co',
@@ -69,7 +74,10 @@ return [
         'absolute_seconds' => (int) (getenv('SESSION_ABSOLUTE_SECONDS') ?: 43200),
         'idle_seconds' => (int) (getenv('SESSION_IDLE_SECONDS') ?: 1800),
         // Set to true when serving over HTTPS.
-        'cookie_secure' => filter_var(getenv('SESSION_COOKIE_SECURE') ?: 'false', FILTER_VALIDATE_BOOL),
+        'cookie_secure' => filter_var(
+            getenv('SESSION_COOKIE_SECURE') ?: ($onVercel ? 'true' : 'false'),
+            FILTER_VALIDATE_BOOL,
+        ),
         // Lax keeps the cookie on the same origin. Use None (with
         // cookie_secure on) when the frontend and the API are on different
         // hosts, so the browser still sends the session.
@@ -92,6 +100,16 @@ return [
         'default_working_days' => (int) (getenv('PAYROLL_DEFAULT_WORKING_DAYS') ?: 22),
         // Jurisdiction label recorded against configured rules.
         'jurisdiction' => getenv('PAYROLL_JURISDICTION') ?: 'demo',
+    ],
+
+    'deployment' => [
+        // Vercel Functions are immutable, so the first API invocation can
+        // safely prepare the isolated PostgreSQL schema. A database advisory
+        // lock prevents two cold starts from racing each other.
+        'auto_setup' => filter_var(
+            getenv('APP_AUTO_SETUP') ?: ($onVercel ? 'true' : 'false'),
+            FILTER_VALIDATE_BOOL,
+        ),
     ],
 
     'paths' => [
