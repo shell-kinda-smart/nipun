@@ -11,6 +11,8 @@ declare(strict_types=1);
  */
 
 $root = dirname(__DIR__);
+$databaseUrl = getenv('DATABASE_URL') ?: '';
+$defaultDriver = preg_match('#^postgres(?:ql)?://#i', $databaseUrl) === 1 ? 'pgsql' : 'mysql';
 
 return [
     'app' => [
@@ -47,9 +49,15 @@ return [
     ],
 
     'db' => [
-        'driver' => getenv('DB_DRIVER') ?: 'mysql',
+        'driver' => getenv('DB_DRIVER') ?: $defaultDriver,
+        // DATABASE_URL is the preferred deployment setting (Neon/Vercel).
+        // The individual fields remain available for MySQL and local use.
+        'url' => $databaseUrl,
+        // PostgreSQL deployments are isolated from other applications by
+        // putting every PayLens table in this dedicated schema.
+        'schema' => getenv('DB_SCHEMA') ?: 'paylens',
         'host' => getenv('DB_HOST') ?: '127.0.0.1',
-        'port' => (int) (getenv('DB_PORT') ?: 3306),
+        'port' => (int) (getenv('DB_PORT') ?: ($defaultDriver === 'pgsql' ? 5432 : 3306)),
         'database' => getenv('DB_DATABASE') ?: 'paylens',
         'username' => getenv('DB_USERNAME') ?: 'paylens',
         'password' => getenv('DB_PASSWORD') ?: '',

@@ -4,7 +4,24 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
+  "functions": {
+    "api/index.php": {
+      "runtime": "vercel-php@0.9.0"
+    },
+    "api/setup.php": {
+      "runtime": "vercel-php@0.9.0",
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
+    {
+      "source": "/api/setup",
+      "destination": "/api/setup.php"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.php"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

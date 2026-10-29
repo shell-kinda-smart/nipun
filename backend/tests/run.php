@@ -709,7 +709,7 @@ $t->test('the audit trail is readable only with the audit permission', function 
 });
 
 // ============================================================================
-// The MySQL dialect
+// Database dialects
 // ============================================================================
 $t->group('MySQL dialect');
 
@@ -771,6 +771,18 @@ $t->test('the SQLite branch uses its own syntax', function (TestRunner $t) use (
     $t->assert(str_contains($sql, 'INSERT OR IGNORE INTO'), 'idempotent inserts use INSERT OR IGNORE');
 });
 
+$t->test('the PostgreSQL branch renders PostgreSQL-safe DDL', function (TestRunner $t) use ($renderDdl): void {
+    $sql = implode("\n", $renderDdl('pgsql'));
+    $t->assert(str_contains($sql, 'BIGSERIAL NOT NULL'), 'id columns use BIGSERIAL');
+    $t->assert(str_contains($sql, 'TIMESTAMP WITHOUT TIME ZONE'), 'timestamps use PostgreSQL syntax');
+    $t->assert(str_contains($sql, 'CREATE INDEX IF NOT EXISTS'), 'indexes are separate statements');
+    $t->assert(str_contains($sql, 'ON CONFLICT DO NOTHING'), 'idempotent inserts use ON CONFLICT');
+    $t->assert(!str_contains($sql, 'AUTO_INCREMENT'), 'no MySQL AUTO_INCREMENT');
+    $t->assert(!str_contains($sql, 'TINYINT'), 'no MySQL TINYINT');
+    $t->assert(!str_contains($sql, 'DATETIME'), 'no MySQL DATETIME');
+    $t->assert(!str_contains($sql, 'INSERT IGNORE'), 'no MySQL INSERT IGNORE');
+});
+
 $t->test('every foreign key points at a table the migrations create', function (TestRunner $t) use ($renderDdl): void {
     $sql = $renderDdl('mysql');
     $tables = [];
@@ -827,28 +839,40 @@ $t->test('the upsert statement matches the driver', function (TestRunner $t): vo
     $sqliteSql = implode(' ', $sqlite->executedSql());
     $t->assert(str_contains($sqliteSql, 'ON CONFLICT'), 'SQLite uses ON CONFLICT');
     $t->assert(!str_contains($sqliteSql, 'ON DUPLICATE KEY'), 'SQLite does not use ON DUPLICATE KEY');
+
+    $pgsql = new \PayLens\Core\Database(new \PayLens\Core\Config(['db' => ['driver' => 'pgsql']]));
+    $pgsql->dryRun();
+    $pgsql->upsert('rate_limits', ['id' => 'x', 'attempts' => 1], ['attempts'], ['id']);
+    $pgsqlSql = implode(' ', $pgsql->executedSql());
+    $t->assert(str_contains($pgsqlSql, 'ON CONFLICT'), 'PostgreSQL uses ON CONFLICT');
+    $t->assert(!str_contains($pgsqlSql, 'ON DUPLICATE KEY'), 'PostgreSQL does not use ON DUPLICATE KEY');
 });
 
 $t->test('the MySQL connection settings are the documented ones', function (TestRunner $t): void {
     $config = new \PayLens\Core\Config(require dirname(__DIR__) . '/config/config.php');
     $t->assert(
-        in_array($config->string('db.driver'), ['mysql', 'sqlite'], true),
-        'the driver is mysql or sqlite',
+        in_array($config->string('db.driver'), ['mysql', 'pgsql', 'sqlite'], true),
+        'the driver is mysql, pgsql or sqlite',
     );
     $t->assertSame('utf8mb4', $config->string('db.charset'));
 
-    // MySQL is the production target: the configuration file must default to
-    // it even when a local .env points the development copy at SQLite.
+    // MySQL remains the default without DATABASE_URL; a PostgreSQL URL selects
+    // pgsql automatically for Vercel/Neon deployments.
     $configFile = file_get_contents(dirname(__DIR__) . '/config/config.php');
     $t->assert(
-        str_contains((string) $configFile, "getenv('DB_DRIVER') ?: 'mysql'"),
-        'the configuration defaults to the MySQL driver',
+        str_contains((string) $configFile, "getenv('DB_DRIVER') ?: \$defaultDriver"),
+        'the configuration selects a deployment driver',
     );
 
     $envExample = file_get_contents(dirname(__DIR__) . '/.env.example');
     $t->assert(
         str_contains((string) $envExample, 'DB_DRIVER=mysql'),
         'the environment template documents the MySQL driver',
+    );
+    $t->assert(
+        str_contains((string) $envExample, 'DB_DRIVER=pgsql')
+            && str_contains((string) $envExample, 'DB_SCHEMA=paylens'),
+        'the environment template documents isolated PostgreSQL deployment',
     );
 });
 

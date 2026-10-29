@@ -234,7 +234,8 @@ final class EmployeeRepository
 
     public function nextId(): string
     {
-        $row = $this->db->selectOne("SELECT MAX(CAST(SUBSTR(id, 4) AS UNSIGNED)) AS m FROM employees WHERE id LIKE 'EMP%'");
+        $cast = $this->db->driver() === 'pgsql' ? 'INTEGER' : 'UNSIGNED';
+        $row = $this->db->selectOne("SELECT MAX(CAST(SUBSTR(id, 4) AS {$cast})) AS m FROM employees WHERE id LIKE 'EMP%'");
         $next = (int) ($row['m'] ?? 0) + 1;
         return 'EMP' . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
     }

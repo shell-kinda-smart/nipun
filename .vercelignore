@@ -1,9 +1,8 @@
 # Files that are not part of the Vercel deployment.
 #
-# The frontend is deployed from the repository root. The PHP API is not —
-# it runs on a PHP host, because it needs MySQL and a writable filesystem.
+# The frontend and PHP API deploy together. Keep docs and local-only files out
+# of the deployment, but include backend/ because the PHP function requires it.
 
-backend
 docs
 node_modules
 dist

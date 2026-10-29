@@ -23,8 +23,8 @@ payslip designer, reports, audit logs, command palette, dark / light mode.
 **Backend**
 
 - **PHP 8.2+** with a small hand-rolled kernel — no framework, no Composer
-- **MySQL 8.x** (SQLite for zero-setup local development), **PDO** with
-  prepared statements
+- **PostgreSQL or MySQL 8.x** (SQLite for zero-setup local development),
+  **PDO** with prepared statements
 - **REST-style JSON API** with server-side sessions, RBAC and an audit trail
 - **Integer minor units (paise)** for every monetary amount — no floating
   point in an authoritative total
@@ -73,6 +73,12 @@ php backend/bin/migrate.php --status    # list applied and pending ones
 ```bash
 php backend/tests/run.php              # backend test suite
 ```
+
+## Deployment
+
+The frontend and PHP API can deploy together on Vercel, backed by PostgreSQL
+in an isolated paylens schema. See [DEPLOYMENT.md](DEPLOYMENT.md) for the
+required environment variables, database setup and verification steps.
 
 ## Demo accounts
 

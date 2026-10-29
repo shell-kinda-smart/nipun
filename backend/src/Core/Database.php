@@ -11,9 +11,9 @@ use RuntimeException;
 /**
  * PDO connection factory.
  *
- * MySQL 8.x is the target platform. SQLite is supported as a development
- * fallback so the API, the test-suite and the seed can all be exercised on a
- * machine without a MySQL server; it is never a production target.
+ * PostgreSQL and MySQL are production targets. SQLite is supported as a
+ * development fallback so the API, test-suite and seed can be exercised on a
+ * machine without a database server; it is never a production target.
  */
 final class Database
 {
@@ -80,6 +80,15 @@ final class Database
                 }
                 $this->pdo = new PDO('sqlite:' . $path, null, null, $options);
                 $this->pdo->exec('PRAGMA foreign_keys = ON');
+            } elseif ($this->driver() === 'pgsql') {
+                [$dsn, $username, $password] = $this->postgresConnection();
+                $this->pdo = new PDO($dsn, $username, $password, $options);
+
+                $schema = $this->postgresSchema();
+                $quotedSchema = '"' . str_replace('"', '""', $schema) . '"';
+                $this->pdo->exec('CREATE SCHEMA IF NOT EXISTS ' . $quotedSchema);
+                $this->pdo->exec('SET search_path TO ' . $quotedSchema);
+                $this->pdo->exec("SET TIME ZONE 'UTC'");
             } else {
                 $dsn = sprintf(
                     'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
@@ -167,6 +176,10 @@ final class Database
 
     public function lastInsertId(): string
     {
+        if ($this->driver() === 'pgsql') {
+            $row = $this->selectOne('SELECT LASTVAL() AS id');
+            return (string) ($row['id'] ?? '0');
+        }
         return $this->pdo()->lastInsertId();
     }
 
@@ -189,6 +202,15 @@ final class Database
             }
             return $columns;
         }
+        if ($this->driver() === 'pgsql') {
+            foreach ($this->select(
+                'SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ?',
+                [$table],
+            ) as $row) {
+                $columns[] = (string) $row['column_name'];
+            }
+            return $columns;
+        }
         foreach ($this->select('SHOW COLUMNS FROM ' . $table) as $row) {
             $columns[] = (string) $row['Field'];
         }
@@ -203,6 +225,13 @@ final class Database
      */
     public function addColumnIfMissing(string $table, string $column, string $definition): bool
     {
+        if ($this->driver() === 'pgsql') {
+            $definition = str_ireplace(
+                ['DATETIME', 'TINYINT(1)', 'MEDIUMTEXT'],
+                ['TIMESTAMP WITHOUT TIME ZONE', 'SMALLINT', 'TEXT'],
+                $definition,
+            );
+        }
         if ($this->dryRun) {
             $this->execute("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
             return true;
@@ -232,7 +261,7 @@ final class Database
             $params[$key] = $value;
         }
 
-        if ($this->driver() === 'sqlite') {
+        if ($this->driver() === 'sqlite' || $this->driver() === 'pgsql') {
             $assignments = [];
             foreach ($updateColumns as $column) {
                 $assignments[] = $column . ' = excluded.' . $column;
@@ -280,7 +309,8 @@ final class Database
             $params[$key] = $value;
         }
 
-        $verb = $this->driver() === 'sqlite' ? 'INSERT OR IGNORE INTO' : 'INSERT IGNORE INTO';
+        $driver = $this->driver();
+        $verb = $driver === 'sqlite' ? 'INSERT OR IGNORE INTO' : 'INSERT INTO';
         $sql = sprintf(
             '%s %s (%s) VALUES (%s)',
             $verb,
@@ -288,7 +318,58 @@ final class Database
             implode(', ', $columns),
             implode(', ', $placeholders),
         );
+        if ($driver === 'pgsql') {
+            $sql .= ' ON CONFLICT DO NOTHING';
+        } elseif ($driver === 'mysql') {
+            $sql = preg_replace('/^INSERT INTO/', 'INSERT IGNORE INTO', $sql) ?? $sql;
+        }
 
         $this->execute($sql, $params);
+    }
+
+    /** @return array{0:string,1:string,2:string} */
+    private function postgresConnection(): array
+    {
+        $url = $this->config->string('db.url');
+        if ($url !== '') {
+            $parts = parse_url($url);
+            if ($parts === false || !isset($parts['host'], $parts['path'])) {
+                throw new RuntimeException('Database connection failed.');
+            }
+            parse_str($parts['query'] ?? '', $query);
+            $dsn = sprintf(
+                'pgsql:host=%s;port=%d;dbname=%s;sslmode=%s',
+                $parts['host'],
+                (int) ($parts['port'] ?? 5432),
+                ltrim($parts['path'], '/'),
+                preg_replace('/[^a-z-]/i', '', (string) ($query['sslmode'] ?? 'require')) ?: 'require',
+            );
+            return [
+                $dsn,
+                rawurldecode((string) ($parts['user'] ?? '')),
+                rawurldecode((string) ($parts['pass'] ?? '')),
+            ];
+        }
+
+        $dsn = sprintf(
+            'pgsql:host=%s;port=%d;dbname=%s',
+            $this->config->string('db.host', '127.0.0.1'),
+            $this->config->int('db.port', 5432),
+            $this->config->string('db.database', 'paylens'),
+        );
+        return [
+            $dsn,
+            $this->config->string('db.username', 'postgres'),
+            $this->config->string('db.password', ''),
+        ];
+    }
+
+    private function postgresSchema(): string
+    {
+        $schema = $this->config->string('db.schema', 'paylens');
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $schema) !== 1) {
+            throw new RuntimeException('Invalid PostgreSQL schema name.');
+        }
+        return $schema;
     }
 }

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace PayLens\Core;
 
 /**
- * Tiny schema builder that emits MySQL 8.x DDL and the equivalent SQLite
- * DDL from one definition.
+ * Tiny schema builder that emits MySQL, PostgreSQL and SQLite DDL from one
+ * definition.
  *
  * Migrations are written once; the dialect differences (auto-increment,
  * table-level foreign keys, JSON columns) are handled here so a migration
@@ -40,6 +40,9 @@ final class Schema
         if ($this->db->driver() === 'sqlite') {
             $this->sqliteAutoIncrement = true;
             $this->columns[] = 'id INTEGER PRIMARY KEY AUTOINCREMENT';
+        } elseif ($this->db->driver() === 'pgsql') {
+            $this->columns[] = 'id BIGSERIAL NOT NULL';
+            $this->primary[] = 'id';
         } else {
             $this->columns[] = 'id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT';
             $this->primary[] = 'id';
@@ -63,7 +66,8 @@ final class Schema
     /** A larger TEXT variant, for generated documents. */
     public function mediumText(string $name, bool $nullable = false): self
     {
-        $this->columns[] = $name . ' MEDIUMTEXT' . ($nullable ? ' NULL' : ' NOT NULL');
+        $type = $this->db->driver() === 'pgsql' ? 'TEXT' : 'MEDIUMTEXT';
+        $this->columns[] = $name . ' ' . $type . ($nullable ? ' NULL' : ' NOT NULL');
         return $this;
     }
 
@@ -89,7 +93,8 @@ final class Schema
 
     public function bool(string $name, bool $default = false): self
     {
-        $this->columns[] = $name . ' TINYINT(1) NOT NULL DEFAULT ' . ($default ? 1 : 0);
+        $type = $this->db->driver() === 'pgsql' ? 'SMALLINT' : 'TINYINT(1)';
+        $this->columns[] = $name . ' ' . $type . ' NOT NULL DEFAULT ' . ($default ? 1 : 0);
         return $this;
     }
 
@@ -101,7 +106,8 @@ final class Schema
 
     public function dateTime(string $name, bool $nullable = false): self
     {
-        $this->columns[] = $name . ' DATETIME' . ($nullable ? ' NULL' : ' NOT NULL');
+        $type = $this->db->driver() === 'pgsql' ? 'TIMESTAMP WITHOUT TIME ZONE' : 'DATETIME';
+        $this->columns[] = $name . ' ' . $type . ($nullable ? ' NULL' : ' NOT NULL');
         return $this;
     }
 
@@ -176,9 +182,9 @@ final class Schema
         }
         $parts = array_merge($parts, $this->uniques, $this->foreignKeys);
 
-        // MySQL accepts an inline INDEX clause; SQLite does not and needs a
-        // separate statement.
-        if ($this->db->driver() !== 'sqlite') {
+        // MySQL accepts an inline INDEX clause. PostgreSQL and SQLite need a
+        // separate CREATE INDEX statement.
+        if ($this->db->driver() === 'mysql') {
             foreach ($this->indexes as $index) {
                 $parts[] = 'INDEX ' . $index['name'] . ' (' . implode(', ', $index['columns']) . ')';
             }
@@ -187,10 +193,10 @@ final class Schema
         return 'CREATE TABLE IF NOT EXISTS ' . $this->table . ' (' . implode(', ', $parts) . ')';
     }
 
-    /** The separate CREATE INDEX statements the SQLite branch needs. */
+    /** The separate CREATE INDEX statements PostgreSQL and SQLite need. */
     public function indexStatements(): array
     {
-        if ($this->db->driver() !== 'sqlite') {
+        if ($this->db->driver() === 'mysql') {
             return [];
         }
         $statements = [];

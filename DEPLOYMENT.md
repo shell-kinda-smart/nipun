@@ -1,184 +1,106 @@
-# Deploying PayLens
+# Deploying PayLens on Vercel
 
-The application is two pieces:
+PayLens deploys as one Vercel project:
 
-| Piece | What it is | Where it runs |
-|---|---|---|
-| The repository root | Vite + React + TypeScript, built to `dist/` | Vercel |
-| `backend/` | PHP 8.2+ API, no framework, no Composer | Any PHP 8.2+ host with MySQL 8 |
+- Vite builds the React frontend into the dist directory.
+- api/index.php runs the existing PHP API through the vercel-php runtime.
+- /api/* stays on the same origin as the frontend, so sessions do not need
+  cross-site cookie or CORS exceptions.
+- PostgreSQL stores all PayLens tables in a dedicated paylens schema.
 
-The frontend is static and deploys to Vercel in one click. The API is PHP and
-needs a PHP host — Vercel does not run this application on its own.
+The database may be shared with another application. PostgreSQL schemas are
+separate namespaces, so DB_SCHEMA=paylens prevents PayLens migrations and
+queries from reading or changing tables in public or any other schema.
 
----
+## 1. Required Vercel environment variables
 
-## 1. The API
+Add these in Project Settings → Environment Variables for Production, Preview
+and Development:
 
-### What it needs
+| Variable | Value |
+|---|---|
+| DATABASE_URL | PostgreSQL/Neon pooled connection URL |
+| DB_DRIVER | pgsql |
+| DB_SCHEMA | paylens |
+| APP_ENV | production for real use; demo for a public fictional-data demo |
+| APP_DEBUG | false |
+| APP_DEMO_MODE | false for real use; true only with APP_ENV=demo |
+| APP_URL | Your final Vercel URL, for example https://nipun.vercel.app |
+| APP_FRONTEND_URL | The same Vercel URL |
+| APP_TIMEZONE | Asia/Kolkata |
+| SESSION_COOKIE_SECURE | true |
+| SESSION_COOKIE_SAMESITE | Lax |
+| PAYLENS_SEED_PASSWORD | A new strong password |
+| APP_SETUP_TOKEN | A temporary random value of at least 32 characters |
 
-- PHP 8.2 or newer with `pdo_mysql`
-- MySQL 8.x
-- The document root pointed at `backend/public`
+Leave VITE_API_URL and CORS_ORIGINS unset. The frontend and API use the same
+Vercel origin.
 
-### On the server
+Never paste database credentials into a tracked file. Vercel encrypts project
+environment variables; backend/.env is ignored by both Git and Vercel.
 
-```bash
-# 1. The database
-mysql -u root -p -e "CREATE DATABASE paylens CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+## 2. Create and seed the isolated schema
 
-# 2. The code
-git clone <your repository> paylens
-cd paylens
+Before the first deployment, run the migrations and optional demo seed with
+the same DATABASE_URL, DB_DRIVER=pgsql and DB_SCHEMA=paylens values:
 
-# 3. The environment — every value is also settable as a real environment
-#    variable, which is what a PaaS deployment should use.
-cp backend/.env.example backend/.env
-```
+~~~bash
+php backend/bin/migrate.php
+php backend/bin/setup.php
+~~~
 
-Set these in `backend/.env` (or as environment variables):
+migrate.php only applies missing migrations. setup.php leaves an existing
+dataset alone.
 
-```ini
-APP_ENV=production
-APP_DEBUG=false
-APP_DEMO_MODE=true          # keep the one-click demo sign-in; turn off for a real deployment
-APP_URL=https://api.example.com
-APP_FRONTEND_URL=https://paylens.vercel.app
+If PHP is not installed locally, deploy once with APP_SETUP_TOKEN set and call
+the protected one-time setup function:
 
-DB_DRIVER=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=paylens
-DB_USERNAME=paylens
-DB_PASSWORD=<a strong password>
+~~~bash
+curl -X POST https://YOUR-DOMAIN/api/setup \
+  -H "Authorization: Bearer YOUR_APP_SETUP_TOKEN"
+~~~
 
-SESSION_COOKIE_SECURE=true
-SESSION_COOKIE_SAMESITE=None # only when the frontend is on another host
-CORS_ORIGINS=https://paylens.vercel.app
+After it succeeds, remove APP_SETUP_TOKEN from Vercel and redeploy. The setup
+URL then returns 404. Never commit or share this token.
 
-PAYLENS_SEED_PASSWORD=<a strong password>
-```
+## 3. Import the GitHub repository
 
-> `CORS_ORIGINS` is a comma-separated list of the exact origins allowed to
-> call the API. `SESSION_COOKIE_SAMESITE=None` and `SESSION_COOKIE_SECURE=true`
-> are needed only when the frontend and the API are on **different** hosts:
-> a browser only sends a cross-site session cookie under those two settings.
-> Both hosts must be on HTTPS.
+1. Open the Vercel dashboard and choose Add New → Project.
+2. Import shell-kinda-smart/nipun.
+3. Keep the repository root as the project root.
+4. Vercel reads vercel.json; the expected settings are:
+   - Framework: Vite
+   - Build command: npm run build
+   - Output directory: dist
+5. Add the environment variables above.
+6. Select Deploy.
+7. Run the one-time setup call from section 2.
+8. Remove APP_SETUP_TOKEN and redeploy.
 
-### Create the schema and the demo data
+Future pushes to main create new production deployments automatically.
 
-```bash
-php backend/bin/migrate.php      # apply every migration
-php backend/bin/setup.php         # load the demo dataset
-```
+## 4. Verify the deployment
 
-`setup.php` is safe to re-run: it applies pending migrations and leaves an
-existing dataset alone.
+Check these in order:
 
-### Serve it
+~~~text
+https://YOUR-DOMAIN/api/auth/demo-users
+https://YOUR-DOMAIN/
+https://YOUR-DOMAIN/employees
+~~~
 
-With Nginx, the document root is `backend/public` and every request that is
-not a file is handed to `backend/public/router.php`:
+The first URL must return JSON, the home page must load, and refreshing a
+client-side route such as /employees must not return 404.
 
-```nginx
-server {
-    listen 443 ssl;
-    server_name api.example.com;
-    root /var/www/paylens/backend/public;
-    index index.php;
+Then sign in, create or edit a test employee, and confirm the change survives
+a refresh. That verifies the PHP function, session cookie and PostgreSQL
+schema together.
 
-    location / {
-        try_files $uri $uri/ /router.php$is_args$args;
-    }
+## Notes
 
-    location ~ \.php$ {
-        include fastcgi_params;
-        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-    }
-}
-```
-
-The built-in PHP server works too, for a quick check:
-
-```bash
-php -S 127.0.0.1:8080 -t backend/public backend/public/router.php
-```
-
-### Check it
-
-```bash
-curl https://api.example.com/api/auth/demo-users
-```
-
----
-
-## 2. The frontend on Vercel
-
-### With the Git repository
-
-1. Push the code to GitHub, GitLab or Bitbucket.
-2. In Vercel, **Add New → Project** and import the repository.
-3. Leave everything on the defaults. `vercel.json` already sets the build
-   command, the output directory and the SPA rewrite.
-4. Set the environment variable:
-
-   | Variable | Value |
-   |---|---|
-   | `VITE_API_URL` | `https://api.example.com` |
-
-   Leave it unset if the API is served from the same origin as the frontend.
-
-5. **Deploy.**
-
-### From the command line
-
-```bash
-npm install -g vercel
-vercel login
-vercel --prod --build-env VITE_API_URL=https://api.example.com
-```
-
-### Why the rewrite is needed
-
-The frontend uses the HTML5 history API, so `/employees/EMP001` is a real
-URL. Without the rewrite in `vercel.json`, Vercel would answer it with a 404
-instead of `index.html`. The rewrite deliberately leaves `/api/*` alone.
-
----
-
-## 3. Putting both on one host
-
-This is the simpler arrangement, and it avoids CORS and cross-site cookies
-entirely: build the frontend and serve it from the same origin as the API.
-
-```bash
-npm run build
-cp -r dist/* /var/www/paylens/backend/public/
-```
-
-Nginx then serves `index.html` for any path that is not a file and not under
-`/api`:
-
-```nginx
-location / {
-    try_files $uri $uri/ /index.html;
-}
-
-location /api/ {
-    try_files $uri $uri/ /router.php$is_args$args;
-}
-```
-
-Leave `VITE_API_URL` unset and `CORS_ORIGINS` empty in this arrangement.
-
----
-
-## 4. Before the demo
-
-- [ ] `APP_ENV=production` and `APP_DEBUG=false`
-- [ ] `PAYLENS_SEED_PASSWORD` changed from the default
-- [ ] `DB_PASSWORD` is not the default
-- [ ] Both hosts on HTTPS
-- [ ] `CORS_ORIGINS` lists the frontend's exact origin
-- [ ] `php backend/tests/run.php` passes
-- [ ] The demo accounts are signable from the deployed frontend
+- Vercel's PHP support uses the recommended community vercel-php runtime, not
+  an official first-party PHP runtime.
+- SQLite must not be used in production because Vercel Functions have an
+  ephemeral filesystem.
+- Keep the Vercel Function region close to the PostgreSQL region to reduce
+  latency.
