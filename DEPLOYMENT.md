@@ -14,10 +14,12 @@ queries from reading or changing tables in public or any other schema.
 
 ## 1. Environment file
 
-For the zero-configuration demo, import the existing
-rags-to-riches/.env file into Vercel's Environment Variables screen. PayLens
-uses its DATABASE_URL and ignores the unrelated Rags to Riches variables.
-Do not commit this file: the GitHub repository is public.
+For the zero-configuration demo, import the dedicated paylens/.env file into
+Vercel's Environment Variables screen. It contains the shared PostgreSQL
+connection plus PayLens-specific application settings. The Rags to Riches
+environment file is not modified.
+
+Do not commit the PayLens environment file: the GitHub repository is public.
 
 No additional variables are required. On Vercel, PayLens automatically uses
 these safe demo defaults:
@@ -58,7 +60,7 @@ left alone on later starts.
    - Framework: Vite
    - Build command: npm run build
    - Output directory: dist
-5. Import rags-to-riches/.env in the Environment Variables screen.
+5. Import paylens/.env in the Environment Variables screen.
 6. Select Deploy.
 7. Open the deployed site. Its first API request performs the isolated setup.
 

@@ -27,7 +27,9 @@ Autoloader::register([
     'PayLens\\Tests\\' => $baseDir . '/tests',
 ]);
 
-// .env is optional; in production the values come from the real environment.
+// The project-level file is the canonical local/Vercel import file. The
+// backend-specific file remains supported as an optional local override.
+Env::load(dirname($baseDir) . '/.env');
 Env::load($baseDir . '/.env');
 
 $app = App::boot($baseDir);
