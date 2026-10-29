@@ -1,0 +1,174 @@
+/* =============================================================================
+ * PayLens — Design Tokens
+ * Deep Navy + Gold identity
+ *
+ * Imported by src/index.css. Every value below is contrast-verified against
+ * WCAG 2.1 AA in BOTH themes.
+ *
+ * Reference palette
+ *   Deep navy   #060E1F   page / deepest surface (dark theme)
+ *   Navy blue   #132C5C   brand surface, primary structural navy
+ *   Gold        #C9A54E   accent + call-to-action fill
+ *   Soft gold   #F7EFDC   warm tint surface (light theme)
+ *   Background  #F4F6FA   light theme page
+ *   Card white  #FFFFFF   light theme card
+ *   Success     #1F9D6B   Warning  #C98A16   Error  #C4483F
+ *
+ * Verified contrast ratios
+ *   body text on page          17.9:1 (light)  17.3:1 (dark)   AAA
+ *   gold CTA (navy on gold)     8.3:1                            AAA
+ *   muted text on page          5.7:1 (light)   7.0:1 (dark)    AA
+ *   status text on card         5.1-5.7:1                       AA
+ *   input borders               3.1:1                           AA (1.4.11)
+ *   chart series on card       >= 3.2:1                         AA
+ *
+ * NOTE on --primary / --primary-ink
+ *   --primary is the gold FILL. Gold #C9A54E is only 2.3:1 on white, so it
+ *   must never be used as text on a light surface. --primary-ink is the
+ *   text-safe gold for that job: a deep bronze in light mode, a bright gold
+ *   in dark mode. Use `text-primary` for fills, `text-primary-ink` for gold
+ *   text on a surface.
+ * ========================================================================== */
+
+@layer base {
+  :root {
+    /* ── Surfaces ───────────────────────────────────────────────── */
+    --background: 220 37% 97%; /* #F4F6FA */
+    --foreground: 221 68% 7%; /* #060E1F */
+    --card: 0 0% 100%; /* #FFFFFF */
+    --card-foreground: 221 68% 7%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 221 68% 7%;
+
+    /* ── Brand ──────────────────────────────────────────────────── */
+    --primary: 42 53% 55%; /* #C9A54E gold */
+    --primary-foreground: 221 68% 7%; /* navy text on gold */
+    --primary-ink: 40 65% 33%; /* #8B661D gold text on light surfaces */
+    --secondary: 220 20% 92%;
+    --secondary-foreground: 221 50% 16%;
+    --muted: 220 22% 94%;
+    --muted-foreground: 220 12% 40%;
+    --accent: 42 63% 92%; /* #F7EFDC soft gold */
+    --accent-foreground: 221 60% 12%;
+
+    /* ── Status ─────────────────────────────────────────────────── */
+    --destructive: 4 53% 46%; /* #C4483F */
+    --destructive-foreground: 0 0% 100%;
+    --success: 156 62% 30%; /* #1F9D6B */
+    --success-foreground: 0 0% 100%;
+    --warning: 39 78% 32%; /* #C98A16 */
+    --warning-foreground: 0 0% 100%;
+    --info: 205 60% 40%;
+    --info-foreground: 0 0% 100%;
+
+    /* ── Lines & focus ──────────────────────────────────────────── */
+    --border: 220 18% 86%;
+    --input: 220 16% 57%; /* 3.1:1 on card — WCAG 1.4.11 */
+    --ring: 40 65% 33%;
+    --radius: 0.625rem;
+
+    /* ── Brand surface (marketing: hero, login split panel) ────── */
+    --brand: 219 66% 22%; /* #132C5C navy blue */
+    --brand-foreground: 42 63% 92%; /* #F7EFDC soft gold */
+
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    /* The sidebar is the brand navy in both themes: it is the one surface
+       that stays constant while the page around it changes. */
+    --sidebar: 219 66% 22%; /* #132C5C */
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-accent: 219 48% 33%;
+    --sidebar-border: 219 45% 34%;
+    --sidebar-muted-foreground: 213 22% 74%;
+
+    /* ── Chart series ───────────────────────────────────────────── */
+    --chart-1: 221 68% 22%; /* navy */
+    --chart-2: 42 60% 43%; /* deep gold */
+    --chart-3: 205 60% 45%; /* azure */
+    --chart-4: 156 55% 38%; /* green */
+    --chart-5: 4 55% 50%; /* red */
+
+    /* ── Department series (stable identity per department) ─────── */
+    --dept-eng: 219 66% 22%;
+    --dept-sales: 42 62% 44%;
+    --dept-ops: 205 60% 45%;
+    --dept-people: 156 55% 38%;
+  }
+
+  .dark {
+    /* ── Surfaces ───────────────────────────────────────────────── */
+    --background: 221 68% 7%; /* #060E1F deep navy */
+    --foreground: 210 20% 95%;
+    --card: 219 55% 12%;
+    --card-foreground: 210 20% 95%;
+    --popover: 219 55% 13%;
+    --popover-foreground: 210 20% 95%;
+
+    /* ── Brand ──────────────────────────────────────────────────── */
+    --primary: 42 53% 55%; /* #C9A54E gold */
+    --primary-foreground: 221 68% 7%;
+    --primary-ink: 42 62% 62%; /* #DAB662 — bright gold, 10:1 on navy */
+    --secondary: 219 45% 16%;
+    --secondary-foreground: 210 18% 92%;
+    --muted: 219 40% 16%;
+    --muted-foreground: 215 12% 62%;
+    --accent: 219 50% 18%;
+    --accent-foreground: 42 62% 72%;
+
+    /* ── Status ─────────────────────────────────────────────────── */
+    --destructive: 4 68% 62%;
+    --destructive-foreground: 221 68% 7%;
+    --success: 156 62% 48%;
+    --success-foreground: 221 68% 7%;
+    --warning: 39 80% 56%;
+    --warning-foreground: 221 68% 7%;
+    --info: 205 65% 60%;
+    --info-foreground: 221 68% 7%;
+
+    /* ── Lines & focus ──────────────────────────────────────────── */
+    --border: 219 40% 20%;
+    --input: 219 25% 44%;
+    --ring: 42 62% 62%;
+    --radius: 0.625rem;
+
+    /* ── Brand surface ──────────────────────────────────────────── */
+    --brand: 219 66% 22%;
+    --brand-foreground: 42 63% 92%;
+
+    /* ── Sidebar ────────────────────────────────────────────────── */
+    --sidebar: 221 58% 10%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-accent: 219 44% 21%;
+    --sidebar-border: 219 38% 26%;
+    --sidebar-muted-foreground: 213 18% 68%;
+
+    /* ── Chart series ───────────────────────────────────────────── */
+    --chart-1: 42 62% 62%; /* gold */
+    --chart-2: 205 65% 62%; /* azure */
+    --chart-3: 156 58% 52%; /* green */
+    --chart-4: 215 70% 70%; /* periwinkle */
+    --chart-5: 4 65% 62%; /* red */
+
+    /* ── Department series ──────────────────────────────────────── */
+    --dept-eng: 214 52% 67%;
+    --dept-sales: 42 62% 62%;
+    --dept-ops: 205 65% 62%;
+    --dept-people: 156 58% 52%;
+  }
+}
+
+/* =============================================================================
+ * Raw hex palette — for the places CSS variables cannot reach: inline SVG,
+ * recharts `fill` attributes, the payslip designer, printed output and
+ * exported HTML/CSV reports.
+ * ========================================================================== */
+:root {
+  --pl-navy-deep: #060e1f;
+  --pl-navy: #132c5c;
+  --pl-gold: #c9a54e;
+  --pl-gold-soft: #f7efdc;
+  --pl-bg: #f4f6fa;
+  --pl-white: #ffffff;
+  --pl-success: #1f9d6b;
+  --pl-warning: #c98a16;
+  --pl-error: #c4483f;
+}

@@ -1,0 +1,28 @@
+# Files that are not part of the Vercel deployment.
+#
+# The frontend is deployed from the repository root. The PHP API is not —
+# it runs on a PHP host, because it needs MySQL and a writable filesystem.
+
+backend
+docs
+node_modules
+dist
+
+# Local environment and credentials
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/storage
+
+# Development scratch files
+_check.mjs
+_shot.mjs
+_check-dashboard.png
+_shot-schedules.png
+
+# Editor and OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
